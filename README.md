@@ -1,7 +1,7 @@
 # WinformSerial
 vs의 winform으로 c#을 이용해서 serial 통신을 만들어보았다.  
 첫 c#이라 코드가 엉망이다.  
-구글링으로 serial통신까지는 많이 참고했지만 chart 연동은 나오지 않아서 꽤나 애를 먹었다.
+구글링으로 serial통신까지는 많이 참고했지만 chart 연동은 나오지 않아서 꽤나 애를 먹었다.  
 chart를 구현하기위해 queue 를 처음 이용해 본 것이 의미가 있다. 
 
 ## 기능
