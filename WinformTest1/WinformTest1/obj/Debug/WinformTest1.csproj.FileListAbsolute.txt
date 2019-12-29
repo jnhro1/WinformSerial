@@ -1,0 +1,10 @@
+C:\Users\jonahyun\source\repos\WinformTest1\WinformTest1\bin\Debug\WinformTest1.exe.config
+C:\Users\jonahyun\source\repos\WinformTest1\WinformTest1\bin\Debug\WinformTest1.exe
+C:\Users\jonahyun\source\repos\WinformTest1\WinformTest1\bin\Debug\WinformTest1.pdb
+C:\Users\jonahyun\source\repos\WinformTest1\WinformTest1\obj\Debug\WinformTest1.Form1.resources
+C:\Users\jonahyun\source\repos\WinformTest1\WinformTest1\obj\Debug\WinformTest1.Properties.Resources.resources
+C:\Users\jonahyun\source\repos\WinformTest1\WinformTest1\obj\Debug\WinformTest1.csproj.GenerateResource.cache
+C:\Users\jonahyun\source\repos\WinformTest1\WinformTest1\obj\Debug\WinformTest1.csproj.CoreCompileInputs.cache
+C:\Users\jonahyun\source\repos\WinformTest1\WinformTest1\obj\Debug\WinformTest1.exe
+C:\Users\jonahyun\source\repos\WinformTest1\WinformTest1\obj\Debug\WinformTest1.pdb
+C:\Users\jonahyun\source\repos\WinformTest1\WinformTest1\obj\Debug\WinformTest1.csprojAssemblyReference.cache
