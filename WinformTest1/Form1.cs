@@ -13,7 +13,6 @@ using System.Windows.Forms.DataVisualization.Charting;
 using System.Text.RegularExpressions;
 
 
-
 namespace WinformTest1
 {
     public partial class Form1 : Form
@@ -23,14 +22,20 @@ namespace WinformTest1
         delegate void SetTextCallback(string opt);
         //string RBuffer; // 수신버퍼로 사용할 문자열 변수선언
         private Thread testThread;
-        private double[] cpuArray = new double[6000];
+        private byte[] cpuArray = new byte[6000];
+
+        private Queue<int> que = new Queue<int>();
+        private Queue<string> que_string = new Queue<string>();
 
         private Point currentMouseLcation = Point.Empty; // 현재 마우스 위치
         private RectangleF plotArea = RectangleF.Empty; // InnerPlotPostion
 
-
-
         Stopwatch sw = new Stopwatch(); // 경과시간 측정을 위한 stopwatch 선언
+
+        int cnt = 0;
+        long wheelZoom = 10000;
+        double ZoomScale = 100;
+        Boolean wheelDown = true;
 
         public Form1()
         {
@@ -76,7 +81,7 @@ namespace WinformTest1
             }
             catch (UnauthorizedAccessException)
             {
-                MessageBox.Show("포트가 이미 열려 있습니다.");
+                MessageBox.Show("포트가 이미 열려 있습니다!");
             }
 
             if (serialPort1.IsOpen == true)
@@ -91,46 +96,29 @@ namespace WinformTest1
 
                 richTextBox2.Enabled = true;
 
+
                 SerialChart1.Series[0].Points.Clear(); // 시리얼차트에 찍힌 데이터포인트를 클리어한다.
-                SerialChart1.ChartAreas[0].AxisX.Minimum = sw.ElapsedMilliseconds; // 시리얼차트의 x축 최소값을 스탑워치의 현재시간값으로 설정.
-                SerialChart1.ChartAreas[0].AxisX.Maximum = sw.ElapsedMilliseconds + 5000; // 시리얼차트의 x축 최대값을 스탑워치의 '현재시간 + 5000'값으로 설정.
+                SerialChart1.ChartAreas[0].AxisX.Minimum = 0;// sw.ElapsedMilliseconds; // 시리얼차트의 x축 최소값을 스탑워치의 현재시간값으로 설정.
+                SerialChart1.ChartAreas[0].AxisX.Maximum = sw.ElapsedMilliseconds + 10000; // 시리얼차트의 x축 최대값을 스탑워치의 '현재시간 + 5000'값으로 설정.
+                                                                                           // SerialChart1.ChartAreas[0].AxisX.Maximum = 50;
+                SerialChart1.ChartAreas[0].AxisX.LabelStyle.Format = "#";
+                SerialChart1.ChartAreas[0].AxisY.Minimum = 0;
+                SerialChart1.ChartAreas[0].AxisY.Maximum = 4096;
+                SerialChart1.ChartAreas[0].AxisY.LabelStyle.Format = "#";
 
-                ////////////////////////////////////////////////////////////////////////////////
-                
-
-
-                 SerialChart1.ChartAreas[0].AxisX.ScrollBar.Enabled = true;
-                 SerialChart1.ChartAreas[0].AxisX.ScrollBar.Size = 20;
-                 SerialChart1.ChartAreas[0].AxisX.ScrollBar.ButtonStyle =
-                     System.Windows.Forms.DataVisualization.Charting.ScrollBarButtonStyles.All;
-                 SerialChart1.ChartAreas[0].AxisX.ScrollBar.IsPositionedInside = true;
-       
-                this.SerialChart1.ChartAreas[0].CursorX.AutoScroll = true;
-
-                this.SerialChart1.ChartAreas[0].AxisY.ScaleView.Zoomable = true;
-                this.SerialChart1.ChartAreas[0].CursorY.IsUserEnabled = true;
-                this.SerialChart1.ChartAreas[0].CursorY.IsUserSelectionEnabled = true;
-                
-                 SerialChart1.ChartAreas[0].AxisX.ScaleView.Zoomable = true;
-                 SerialChart1.ChartAreas[0].CursorX.IsUserEnabled = true;
-                 SerialChart1.ChartAreas[0].CursorX.IsUserSelectionEnabled = true;
-                 this.SerialChart1.ChartAreas[0].CursorX.Interval = 5;
-                // 커서 선택 단위를 막대그래프 한개씩 함.
-
+                SerialChart1.ChartAreas[0].AxisX.ScaleView.Zoomable = true;
                 SerialChart1.ChartAreas[0].AxisY.ScaleView.Zoomable = true;
-                SerialChart1.ChartAreas[0].CursorY.IsUserEnabled = true;
-                SerialChart1.ChartAreas[0].CursorY.IsUserSelectionEnabled = true;
-                this.SerialChart1.ChartAreas[0].CursorY.Interval = 50;
-                SerialChart1.ChartAreas[0].AxisY.Interval = 0;
+                SerialChart1.MouseWheel += SerialChart1_MouseWheel;
 
                 sw.Start(); // 정의된 스탑워치 sw를 통해 경과시간측정을 시작한다.
 
                 testThread = new Thread(new ThreadStart(this.getPerformanceCounters));
-                //testThread.IsBackground = true;
+                testThread.IsBackground = true;
                 testThread.Start();
 
             }
         }
+
 
         private void button_PortClose_Click(object sender, EventArgs e)
         {
@@ -143,11 +131,11 @@ namespace WinformTest1
             comboBox2.Enabled = true;
 
             richTextBox2.Enabled = false;
-            SerialChart1.Enabled = false;
+            //richTextBox4.Enabled = false;
+            //richTextBox5.Enabled = false;
+            // SerialChart1.Enabled = false;
 
-            sw.Stop();
-            //sw.Reset(); // 경과시작측정을 중지하고 경과시작을 다시 0으로 설정.
-
+            sw.Reset(); // 경과시작측정을 중지하고 경과시작을 다시 0으로 설정.
         }
 
         private void Form1_Load(object sender, EventArgs e)
@@ -161,42 +149,44 @@ namespace WinformTest1
             richTextBox2.Enabled = false;
         }
 
-         private void serialPort1_DataReceived(object sender, SerialDataReceivedEventArgs e)
-         {
-             int i_recv_size = serialPort1.BytesToRead;
-             byte[] b_tmp_buf = new byte[i_recv_size];
-             string recv_str = "";
+        private void serialPort1_DataReceived(object sender, SerialDataReceivedEventArgs e)
+        {
+            int i_recv_size = serialPort1.BytesToRead;
+            byte[] b_tmp_buf = new byte[i_recv_size];
+            string recv_str = "";
 
 
-             serialPort1.Read(b_tmp_buf, 0, i_recv_size);
+            serialPort1.Read(b_tmp_buf, 0, i_recv_size);
 
 
-             recv_str = Encoding.Default.GetString(b_tmp_buf);
- 
+            recv_str = Encoding.Default.GetString(b_tmp_buf);
 
-             string strValue = recv_str;
-             strValue = System.Text.RegularExpressions.Regex.Replace(recv_str, @"[^\d]", "");
-            double data;
+            string[] sp = new string[] { ", \r\n" };
+            string[] spstring = recv_str.Split(sp, StringSplitOptions.RemoveEmptyEntries);
 
-            data = Convert.ToDouble(strValue);
+            for (int i = 0; i < spstring.Length; i++)
+            {
+                cnt++;
+                if (que.Count >= 10000)
+                {
+                    que.Dequeue();
+                }
+                que.Enqueue(int.Parse(spstring[i]));
+            }
 
-            for (int i=0; i< 6000; i++)
-             {
-               // if (data <= 0) break;
-                cpuArray[i] = data;
-             }
 
             this.BeginInvoke(new SetTextCallback(display_data), new object[] { recv_str });
-             this.BeginInvoke(new SetTextCallback(str2hex), new object[] { recv_str });
+            this.BeginInvoke(new SetTextCallback(str2hex), new object[] { recv_str });
 
-         }
+        }
 
-     
+
         private void display_data(string str)
         {
             richTextBox1.Text += str;
             richTextBox1.SelectionStart = richTextBox1.TextLength;
             richTextBox1.ScrollToCaret();
+
         }
 
         private void str2hex(string strData)
@@ -253,41 +243,77 @@ namespace WinformTest1
         {
             while (true)
             {
+                if (SerialChart1.IsHandleCreated)
+                {
+                    this.BeginInvoke((MethodInvoker)delegate { UpdateCpuChart(); });
+                }
 
-                //Array.Copy(cpuArray, 1, cpuArray, 0, cpuArray.Length - 1);
-
-                  if (SerialChart1.IsHandleCreated)
-                   {
-                       this.Invoke((MethodInvoker) delegate { UpdateChart(); });
-                   }
-                   else
-                   {
-                       //......
-                   }
-
-            Thread.Sleep(600);
+                Thread.Sleep(50);
             }
         }
 
-        private void UpdateChart()
+        private void UpdateCpuChart()
         {
-            //SerialChart1.Series["Series1"].Points.Clear();
-
-             for (int i = 0; i < cpuArray.Length - 1; ++i)
-             {
-                 SerialChart1.Series[0].Points.AddXY(sw.ElapsedMilliseconds, cpuArray[i]); // SerialChart1에 x축을 경과시간, y축을 RDec로 설정하여 포인트를 추가한다.
-             }
-
-            if (SerialChart1.Series[0].Points.Count > 0) // SerialChart1에 Series Point가 존재할 경우
+            for (int k = 0; k < que.Count; k++)
             {
-                while (SerialChart1.Series[0].Points[0].XValue < sw.ElapsedMilliseconds - 5000) // X축값이 경과시간으로부터 5000밀리초 이하의 값인 동안
+                if (SerialChart1.Series[0].Points.Count < sw.ElapsedMilliseconds - 10000)
                 {
-                    SerialChart1.Series[0].Points.RemoveAt(0); // SerialChart1의 첫포인트들을 제거한다.
+                    //SerialChart1.Series[0].Points.RemoveAt(0);
+                    SerialChart1.ChartAreas[0].AxisX.Minimum = sw.ElapsedMilliseconds - wheelZoom;// SerialChart1.Series[0].Points[0].XValue;
+                    SerialChart1.ChartAreas[0].AxisX.Maximum = sw.ElapsedMilliseconds;
 
-                       SerialChart1.ChartAreas[0].AxisX.Minimum = SerialChart1.Series[0].Points[0].XValue; // 차트의 포인트 첫값을 X축의 최소값으로 설정.
-                       SerialChart1.ChartAreas[0].AxisX.Maximum = sw.ElapsedMilliseconds+100; // '경과시간 + 100밀리초'를 X축의 최대값으로 설정
+                }
+                int a = que.Dequeue();
+
+                SerialChart1.Series[0].Points.AddXY(sw.ElapsedMilliseconds, a);
+            }
+        }
+
+        private void SerialChart1_MouseWheel(object sender, MouseEventArgs e)
+        {
+            var chart = (Chart)sender;
+            var xAxis = chart.ChartAreas[0].AxisX;
+
+            try
+            {
+                if (e.Delta < 0) // Scrolled down. 
+                {
+                    if (sw.ElapsedMilliseconds - wheelZoom < 4000)
+                    {
+                        wheelZoom = sw.ElapsedMilliseconds;
+
+                        if (wheelDown == true)
+                        {
+                            ZoomScale += 20;
+                        }
+                        wheelDown = false;
+                    }
+                    else
+                    {
+                        wheelZoom += 2000;
+                        ZoomScale += 20;
+                        wheelDown = true;
+                    }
+
+                    SerialChart1.ChartAreas[0].AxisX.Minimum = sw.ElapsedMilliseconds - wheelZoom;
+                    SerialChart1.ChartAreas[0].AxisX.Maximum = sw.ElapsedMilliseconds;
+                }
+                else if (e.Delta > 0) // Scrolled up. 
+                {
+                    if (wheelZoom > 2000)
+                    {
+                        wheelZoom -= 2000;
+                        ZoomScale -= 20;
+                        wheelDown = true;
+                    }
+
+                    SerialChart1.ChartAreas[0].AxisX.Minimum = sw.ElapsedMilliseconds - wheelZoom;
+                    SerialChart1.ChartAreas[0].AxisX.Maximum = sw.ElapsedMilliseconds;
                 }
             }
+            catch { }
         }
+
+
     }
 }
